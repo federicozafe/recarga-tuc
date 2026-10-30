@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<!-- ========================================================================
+     Prototipo funcional — Recarga TUC (app móvil web)
+     IIC3182 · Grupo 5 · Entrega 2
+     Una sola página con 4 vistas que se muestran/ocultan. Sin dependencias.
+     Cada bloque indica qué Decisión de diseño (D1–D7) implementa.
+     ===================================================================== -->
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <!-- viewport: la app está pensada para el celular (mobile-first) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Recarga TUC</title>
+
+  <style>
+    /* ---- Variables de color (tema claro y sobrio; no se evalúa estética) ---- */
+    :root{
+      --fondo:#f2f4f7;        /* fondo de la pantalla */
+      --tarjeta:#ffffff;      /* fondo de las tarjetas/vistas */
+      --texto:#1a1f29;        /* texto principal */
+      --suave:#5b6472;        /* texto secundario */
+      --primario:#1f5ad6;     /* color de acción (botones) */
+      --ok:#1f8a4c;           /* verde: alcanza / éxito */
+      --alerta:#c0392b;       /* rojo: falta saldo */
+      --borde:#e2e6ec;        /* líneas divisorias */
+    }
+
+    /* ---- Reset mínimo ---- */
+    *{box-sizing:border-box; margin:0; padding:0; font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+    body{background:var(--fondo); color:var(--texto); display:flex; justify-content:center; padding:16px; min-height:100vh;}
+
+    /* ---- "Teléfono": contenedor angosto centrado, se ve bien en desktop y móvil ---- */
+    .telefono{width:100%; max-width:400px;}
+
+    /* ---- Cada vista es una tarjeta; solo la que tiene .activa se muestra ---- */
+    .vista{display:none; background:var(--tarjeta); border:1px solid var(--borde); border-radius:16px; padding:22px; margin-bottom:14px;}
+    .vista.activa{display:block;}
+
+    /* ---- Encabezado de la app ---- */
+    .marca{display:flex; align-items:center; gap:8px; font-weight:700; font-size:18px; margin-bottom:18px;}
+    .marca small{font-weight:400; color:var(--suave); font-size:12px;}
+
+    h2{font-size:15px; color:var(--suave); font-weight:600; margin-bottom:6px;}
+
+    /* ---- D1: el saldo se muestra grande y destacado ---- */
+    .saldo-grande{font-size:40px; font-weight:800; letter-spacing:-1px; margin:2px 0 4px;}
+
+    /* ---- D2: indicador de si alcanza para salir hoy ---- */
+    .indicador{font-size:14px; padding:12px 14px; border-radius:12px; margin:14px 0; line-height:1.4;}
+    .indicador.ok{background:#e7f6ee; color:var(--ok);}
+    .indicador.falta{background:#fdecea; color:var(--alerta);}
+    .indicador strong{font-weight:700;}
+
+    /* ---- D6: nota que separa "salida de hoy" de "saldo" ---- */
+    .nota{font-size:12.5px; color:var(--suave); line-height:1.4; margin-top:4px;}
+
+    /* ---- Botones ---- */
+    .btn{display:block; width:100%; border:none; border-radius:12px; padding:15px; font-size:16px; font-weight:700; cursor:pointer; margin-top:10px;}
+    .btn-primario{background:var(--primario); color:#fff;}
+    .btn-primario:disabled{background:#9db6e8; cursor:not-allowed;}
+    .btn-secundario{background:#eef1f6; color:var(--texto);}
+
+    /* ---- D3: campo de monto (se teclea) + montos frecuentes ---- */
+    label{display:block; font-size:13px; color:var(--suave); margin:14px 0 6px;}
+    .campo-monto{display:flex; align-items:center; border:2px solid var(--borde); border-radius:12px; padding:0 14px;}
+    .campo-monto span{font-size:22px; font-weight:700; color:var(--suave);}
+    .campo-monto input{border:none; outline:none; font-size:24px; font-weight:700; width:100%; padding:12px 6px; background:transparent; color:var(--texto);}
+    .frecuentes{display:flex; gap:8px; margin-top:10px;}
+    .frecuentes button{flex:1; border:1px solid var(--borde); background:#fff; border-radius:10px; padding:10px 4px; font-size:13px; font-weight:600; cursor:pointer;}
+    .frecuentes button:hover{border-color:var(--primario); color:var(--primario);}
+
+    /* ---- D7: saldo resultante en vivo ---- */
+    .resultante{background:#f0f4ff; border-radius:12px; padding:14px; margin-top:16px; font-size:15px;}
+    .resultante b{font-size:20px; display:block; margin-top:2px;}
+
+    /* ---- D4: comprobante ---- */
+    .comprobante{border:1px dashed var(--borde); border-radius:12px; padding:16px; margin-top:16px; font-size:14px;}
+    .comprobante .fila{display:flex; justify-content:space-between; padding:5px 0;}
+    .comprobante .fila.total{border-top:1px solid var(--borde); margin-top:6px; padding-top:10px; font-weight:700;}
+
+    .exito{text-align:center; padding:8px 0 4px;}
+    .exito .tilde{font-size:44px;}
+    .exito h1{font-size:20px; margin-top:4px;}
+
+    .cargando{text-align:center; color:var(--suave); padding:20px 0; font-size:15px;}
+  </style>
+</head>
+
+<body>
+  <div class="telefono">
+
+    <!-- ============================ VISTA 1: INICIO ============================ -->
+    <section id="vista-inicio" class="vista activa">
+      <div class="marca">💳 Recarga TUC <small>· Estacionamiento San Joaquín</small></div>
+
+      <!-- D1: el saldo se ve apenas abre la app, sin tener que recargar ni insertar nada -->
+      <h2>Tu saldo</h2>
+      <div class="saldo-grande" id="saldo-inicio">$0</div>
+
+      <!-- D2: traduce el saldo a la decisión real: ¿alcanza para salir hoy? -->
+      <div class="indicador" id="indicador"></div>
+
+      <!-- D6: separa explícitamente "salida de hoy" (prepago del día) de "cargar saldo" -->
+      <p class="nota">La salida de hoy cuesta $2.350. Lo que cargues queda como saldo en tu TUC para esta y las próximas veces.</p>
+
+      <!-- Lleva a la tarea T1 (recargar) -->
+      <button class="btn btn-primario" onclick="irARecargar()">Cargar saldo</button>
+    </section>
+
+    <!-- =========================== VISTA 2: RECARGAR =========================== -->
+    <section id="vista-recargar" class="vista">
+      <div class="marca">💳 Recarga TUC</div>
+
+      <h2>Saldo actual</h2>
+      <div style="font-size:22px; font-weight:700; margin-bottom:6px;" id="saldo-recargar">$0</div>
+
+      <!-- D3: se teclea el monto directamente (reemplaza el "+" de a $200 del tótem). D6: la etiqueta deja claro que queda como saldo -->
+      <label for="input-monto">Monto a cargar (queda como saldo)</label>
+      <div class="campo-monto">
+        <span>$</span>
+        <!-- inputmode numeric: en el celular abre el teclado numérico -->
+        <input id="input-monto" type="text" inputmode="numeric" placeholder="0" oninput="alTipearMonto()">
+      </div>
+
+      <!-- D3: montos frecuentes para cargar de una, sin teclear -->
+      <div class="frecuentes">
+        <button onclick="ponerMonto(2350)">$2.350</button>
+        <button onclick="ponerMonto(5000)">$5.000</button>
+        <button onclick="ponerMonto(10000)">$10.000</button>
+      </div>
+
+      <!-- D7: saldo resultante en vivo, antes de pagar -->
+      <div class="resultante">
+        Quedarás con:
+        <b id="resultante">$0</b>
+      </div>
+
+      <!-- D5: el pago se hace desde el celular (no hay que ir al tótem) -->
+      <button class="btn btn-primario" id="btn-pagar" onclick="irAPago()" disabled>Pagar desde el celular</button>
+      <button class="btn btn-secundario" onclick="volverInicio()">Volver</button>
+    </section>
+
+    <!-- ============================= VISTA 3: PAGO ============================= -->
+    <!-- D5: simula el pago desde el teléfono (reemplaza la máquina Transbank física) -->
+    <section id="vista-pago" class="vista">
+      <div class="marca">💳 Recarga TUC</div>
+      <h2>Pago</h2>
+      <p style="margin:10px 0 4px;">Vas a cargar <b id="pago-monto">$0</b> con tu medio de pago guardado.</p>
+      <div class="cargando" id="pago-cargando" style="display:none;">Procesando pago…</div>
+      <button class="btn btn-primario" id="btn-confirmar" onclick="confirmarPago()">Confirmar pago</button>
+      <button class="btn btn-secundario" onclick="irARecargar()">Volver</button>
+    </section>
+
+    <!-- ========================= VISTA 4: CONFIRMACIÓN ========================= -->
+    <!-- D4: confirmación que NO desaparece, con el saldo nuevo y el comprobante guardado -->
+    <section id="vista-confirmacion" class="vista">
+      <div class="exito">
+        <div class="tilde">✅</div>
+        <h1>Recarga exitosa</h1>
+      </div>
+
+      <h2 style="margin-top:14px;">Tu nuevo saldo</h2>
+      <div class="saldo-grande" id="saldo-nuevo" style="color:var(--ok);">$0</div>
+
+      <!-- Comprobante: queda a la vista y guardado (no se pierde como en el tótem) -->
+      <div class="comprobante">
+        <div class="fila"><span>Fecha</span><span id="comp-fecha">—</span></div>
+        <div class="fila"><span>Saldo anterior</span><span id="comp-anterior">$0</span></div>
+        <div class="fila"><span>Monto cargado</span><span id="comp-monto">$0</span></div>
+        <div class="fila total"><span>Saldo nuevo</span><span id="comp-nuevo">$0</span></div>
+      </div>
+
+      <!-- D2 otra vez: confirma si ya le alcanza para salir hoy -->
+      <div class="indicador" id="indicador-conf" style="margin-top:16px;"></div>
+
+      <button class="btn btn-primario" onclick="volverInicio()">Listo</button>
+    </section>
+
+  </div>
+
+  <script>
+  // =====================================================================
+  //  LÓGICA DEL PROTOTIPO  (datos de prueba dentro del propio prototipo)
+  // =====================================================================
+
+  // Tarifa de la salida de hoy (prepago del día), dato real del tótem
+  const TARIFA_DIA = 2350;
+  // Saldo inicial de prueba: parte bajo a propósito, para que NO alcance
+  // y así se vea el indicador (D2) y tenga sentido recargar.
+  const SALDO_INICIAL = 1500;
+
+  // Variable que guarda el monto que el usuario está por cargar
+  let montoActual = 0;
+  // Saldo actual (en memoria): parte del inicial y se actualiza al recargar.
+  // Al refrescar la página vuelve al inicial, lo que deja el prototipo
+  // siempre en el mismo estado de partida para la evaluación de la E3.
+  let saldo = SALDO_INICIAL;
+
+  // ---- Formatea un número a pesos chilenos: 1500 -> "$1.500" ----
+  function pesos(n){
+    return "$" + n.toLocaleString("es-CL");                  // es-CL usa punto para los miles
+  }
+
+  // ---- Muestra solo la vista indicada y oculta las demás ----
+  function mostrarVista(id){
+    document.querySelectorAll(".vista").forEach(v => v.classList.remove("activa")); // oculta todas
+    document.getElementById(id).classList.add("activa");     // muestra la pedida
+    window.scrollTo(0,0);                                    // sube al inicio de la pantalla
+  }
+
+  // ---- Pinta el indicador D2 (alcanza / falta) en el elemento dado ----
+  function pintarIndicador(elemento, saldo){
+    if(saldo >= TARIFA_DIA){                                 // si alcanza para salir hoy
+      elemento.className = "indicador ok";
+      elemento.innerHTML = "Con este saldo <strong>te alcanza</strong> para la salida de hoy ($2.350).";
+    } else {                                                 // si no alcanza
+      const falta = TARIFA_DIA - saldo;                      // cuánto le falta
+      elemento.className = "indicador falta";
+      elemento.innerHTML = "Para salir hoy <strong>te faltan " + pesos(falta) + "</strong> (salida: $2.350).";
+    }
+  }
+
+  // ---- Refresca la vista de inicio con el saldo actual (D1 + D2) ----
+  function actualizarInicio(){
+    document.getElementById("saldo-inicio").textContent = pesos(saldo);  // D1: lo muestra grande
+    pintarIndicador(document.getElementById("indicador"), saldo);        // D2: alcanza/falta
+  }
+
+  // ---- T1: ir a la pantalla de recarga ----
+  function irARecargar(){
+    document.getElementById("saldo-recargar").textContent = pesos(saldo); // muestra saldo actual
+    ponerMonto(0);                                           // parte el monto en 0
+    document.getElementById("input-monto").value = "";       // limpia el campo
+    mostrarVista("vista-recargar");
+  }
+
+  // ---- D3: fija un monto desde los botones de montos frecuentes ----
+  function ponerMonto(valor){
+    montoActual = valor;                                     // guarda el monto elegido
+    if(valor > 0) document.getElementById("input-monto").value = valor; // lo refleja en el campo
+    actualizarResultante();                                  // recalcula el resultante (D7)
+  }
+
+  // ---- D3: se dispara cada vez que el usuario teclea en el campo ----
+  function alTipearMonto(){
+    const campo = document.getElementById("input-monto");
+    const limpio = campo.value.replace(/\D/g, "");           // deja solo dígitos (saca $, puntos, letras)
+    campo.value = limpio;                                    // reescribe el campo ya limpio
+    montoActual = limpio === "" ? 0 : Number(limpio);        // actualiza el monto
+    actualizarResultante();                                  // recalcula el resultante (D7)
+  }
+
+  // ---- D7: muestra en vivo con cuánto quedará y habilita/deshabilita el botón ----
+  function actualizarResultante(){
+    const resultante = saldo + montoActual;                  // saldo que quedará tras cargar
+    document.getElementById("resultante").textContent = pesos(resultante);
+    // El botón de pagar solo se habilita si el monto es mayor a 0
+    document.getElementById("btn-pagar").disabled = (montoActual <= 0);
+  }
+
+  // ---- D5: ir a la pantalla de pago (desde el celular) ----
+  function irAPago(){
+    document.getElementById("pago-monto").textContent = pesos(montoActual); // muestra el monto a pagar
+    document.getElementById("pago-cargando").style.display = "none";        // oculta "procesando"
+    document.getElementById("btn-confirmar").style.display = "block";       // muestra el botón
+    mostrarVista("vista-pago");
+  }
+
+  // ---- D5 + D4: confirma el pago, aplica la recarga y arma el comprobante ----
+  function confirmarPago(){
+    // Pequeña simulación visual de "procesando" (0,8 s) para dar feedback del pago
+    document.getElementById("btn-confirmar").style.display = "none";
+    document.getElementById("pago-cargando").style.display = "block";
+
+    setTimeout(function(){
+      const saldoAnterior = saldo;                           // saldo antes de cargar
+      const saldoNuevo = saldoAnterior + montoActual;        // saldo después de cargar
+      saldo = saldoNuevo;                                    // actualiza el saldo en memoria
+
+      // D4: arma el comprobante (queda a la vista y guardado)
+      const fecha = new Date().toLocaleString("es-CL", {day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit"});
+      document.getElementById("comp-fecha").textContent = fecha;
+      document.getElementById("comp-anterior").textContent = pesos(saldoAnterior);
+      document.getElementById("comp-monto").textContent = pesos(montoActual);
+      document.getElementById("comp-nuevo").textContent = pesos(saldoNuevo);
+      document.getElementById("saldo-nuevo").textContent = pesos(saldoNuevo);
+      pintarIndicador(document.getElementById("indicador-conf"), saldoNuevo); // D2: ¿ya alcanza?
+
+      mostrarVista("vista-confirmacion");                    // D4: pantalla que no desaparece sola
+    }, 800);
+  }
+
+  // ---- Volver al inicio (refrescando el saldo mostrado) ----
+  function volverInicio(){
+    actualizarInicio();
+    mostrarVista("vista-inicio");
+  }
+
+  // ---- Al cargar la página, pinta el inicio con el saldo guardado ----
+  actualizarInicio();
+  </script>
+</body>
+</html>
